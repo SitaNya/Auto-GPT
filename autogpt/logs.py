@@ -12,6 +12,7 @@ from colorama import Fore, Style
 
 from autogpt.speech import say_text
 from autogpt.config import Config, Singleton
+from googletrans import Translator
 
 CFG = Config()
 
@@ -75,34 +76,44 @@ class Logger(metaclass=Singleton):
         self.logger.setLevel(logging.DEBUG)
 
     def typewriter_log(
-        self, title="", title_color="", content="", speak_text=False, level=logging.INFO
+            self, title="", title_color="", content="", speak_text=False, level=logging.INFO
     ):
+        translator = Translator()
+        if content and isinstance(content, list):
+                content = " ".join(content)
+
+        # if title:
+        #     try:
+        #         title = translator.translate(title, src='en', dest='zh-CN').text
+        #     except Exception:
+        #         pass
+        # if content and content != "":
+        #     try:
+        #         content = translator.translate(content, src='en', dest='zh-CN').text
+        #     except Exception:
+        #         pass
+        # else:
+        #     content = ""
         if speak_text and CFG.speak_mode:
             say_text(f"{title}. {content}")
-
-        if content:
-            if isinstance(content, list):
-                content = " ".join(content)
-        else:
-            content = ""
 
         self.typing_logger.log(
             level, content, extra={"title": title, "color": title_color}
         )
 
     def debug(
-        self,
-        message,
-        title="",
-        title_color="",
+            self,
+            message,
+            title="",
+            title_color="",
     ):
         self._log(title, title_color, message, logging.DEBUG)
 
     def warn(
-        self,
-        message,
-        title="",
-        title_color="",
+            self,
+            message,
+            title="",
+            title_color="",
     ):
         self._log(title, title_color, message, logging.WARN)
 
@@ -176,10 +187,10 @@ class AutoGptFormatter(logging.Formatter):
     def format(self, record: LogRecord) -> str:
         if hasattr(record, "color"):
             record.title_color = (
-                getattr(record, "color")
-                + getattr(record, "title")
-                + " "
-                + Style.RESET_ALL
+                    getattr(record, "color")
+                    + getattr(record, "title")
+                    + " "
+                    + Style.RESET_ALL
             )
         else:
             record.title_color = getattr(record, "title")

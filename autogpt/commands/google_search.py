@@ -5,6 +5,7 @@ from typing import List, Union
 from duckduckgo_search import ddg
 
 from autogpt.config import Config
+from googleapiclient.errors import HttpError
 
 CFG = Config()
 
@@ -34,26 +35,54 @@ def google_search(query: str, num_results: int = 8) -> str:
 
 
 def google_official_search(query: str, num_results: int = 8) -> Union[str, List[str]]:
-    """Return the results of a google search using the official Google API
-
-    Args:
-        query (str): The search query.
-        num_results (int): The number of results to return.
-
-    Returns:
-        str: The results of the search.
-    """
-
+    import google.auth
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
-    from googleapiclient.errors import HttpError
+    import json
+    import os
+    import pickle
 
+    os.environ["http_proxy"] = "http://127.0.0.1:1431"
+    os.environ["https_proxy"] = "http://127.0.0.1:1431"
+
+    # Define a function to get and save access token
+    def get_credentials(client_secrets_file):
+        creds = None
+        token_file = 'token.pickle'
+
+        if os.path.exists(token_file):
+            with open(token_file, 'rb') as token:
+                creds = pickle.load(token)
+
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                try:
+                    creds = google.oauth2.credentials.Credentials.from_authorized_user_file(client_secrets_file)
+                except ValueError as e: # first run with new secret.json (no refresh_token yet)
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        client_secrets_file=client_secrets_file,
+                        scopes=['https://www.googleapis.com/auth/cse']
+                    )
+                    creds = flow.run_local_server(port=0)
+
+            with open(token_file, 'wb') as token:
+                pickle.dump(creds, token)
+
+        return creds
     try:
-        # Get the Google API key and Custom Search Engine ID from the config file
-        api_key = CFG.google_api_key
-        custom_search_engine_id = CFG.custom_search_engine_id
+        # Get access token
+        client_secrets_file = 'client_secrets.json'
+        credentials = get_credentials(client_secrets_file)
+
+
+        # Get the Custom Search Engine ID from the config file
+        custom_search_engine_id = 'e2ef88cb25af145ff'
 
         # Initialize the Custom Search API service
-        service = build("customsearch", "v1", developerKey=api_key)
+        service = build("customsearch", "v1",credentials=credentials)
 
         # Send the search query and retrieve the results
         result = (

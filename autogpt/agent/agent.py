@@ -1,4 +1,8 @@
+import json
+
 from colorama import Fore, Style
+
+from autogpt import chat
 from autogpt.app import execute_command, get_command
 
 from autogpt.chat import chat_with_ai, create_chat_message
@@ -47,28 +51,53 @@ class Agent:
         loop_count = 0
         command_name = None
         arguments = None
+        # Interaction Loop
+        loop_count = 0
         while True:
             # Discontinue if continuous limit is reached
             loop_count += 1
-            if (
-                cfg.continuous_mode
-                and cfg.continuous_limit > 0
-                and loop_count > cfg.continuous_limit
-            ):
-                logger.typewriter_log(
-                    "Continuous Limit Reached: ", Fore.YELLOW, f"{cfg.continuous_limit}"
-                )
+            if cfg.continuous_mode and cfg.continuous_limit > 0 and loop_count > cfg.continuous_limit:
+                logger.typewriter_log("Continuous Limit Reached: ", Fore.YELLOW, f"{cfg.continuous_limit}")
                 break
 
             # Send message to AI, get response
             with Spinner("Thinking... "):
-                assistant_reply = chat_with_ai(
+                assistant_reply = chat.chat_with_ai(
                     self.prompt,
                     self.user_input,
                     self.full_message_history,
                     self.memory,
-                    cfg.fast_token_limit,
-                )  # TODO: This hardcodes the model to use GPT3.5. Make this an argument
+                    cfg.fast_token_limit)  # TODO: This hardcodes the model to use GPT3.5. Make this an argument
+
+            try:
+                json.loads(assistant_reply)
+            except ValueError as e:
+                if assistant_reply.count('{') == assistant_reply.count('}') == 0:
+                    # remove " and '
+                    assistant_reply = assistant_reply.replace('"', '').replace("'", '')
+                    assistant_reply = '{' \
+                                      '"thoughts": {' \
+                                      '"text": "' + assistant_reply + '",' \
+                                                                      '"reasoning": "",' \
+                                                                      '"plan": "",' \
+                                                                      '"criticism": "",' \
+                                                                      '"speak": ""' \
+                                                                      '},' \
+                                                                      '"command": {' \
+                                                                      '"name": "do_nothing", "args": {}' \
+                                                                      '}' \
+                                                                      '}'
+                elif assistant_reply.count('{') == assistant_reply.count('}'):
+                    # remove everything before the first { and after the last }
+                    assistant_reply = assistant_reply[assistant_reply.find('{'):assistant_reply.rfind('}') + 1]
+                else:
+                    while assistant_reply.count('{') != assistant_reply.count('}'):
+                        if assistant_reply.count('{') > assistant_reply.count('}'):
+                            # add a } to the end
+                            assistant_reply = assistant_reply + '}'
+                        else:
+                            # add a { to the beginning
+                            assistant_reply = '{' + assistant_reply
 
             # Print Assistant thoughts
             print_assistant_thoughts(self.ai_name, assistant_reply)
